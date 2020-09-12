@@ -15,7 +15,7 @@ import queue
 import argparse
 
 menu_data = {
-    'title': "HMC 8043Æ",
+    'title': "HMC 8043",
     'options': [
         {'title': "set com port", 'desc': "List and choose com port"},
         {'title': "open com port", 'desc': "Open com port"},
@@ -349,6 +349,7 @@ if __name__ == "__main__":
     args=parser.parse_args()
     if args.com_port == None:
         serial_port = "COM7"
+        serial_port = "/dev/ttyACM0"
     else:
         serial_port = args.com_port
     #config_file = args.config_file
@@ -392,23 +393,23 @@ if __name__ == "__main__":
     keyboard_thread = threading.Thread(name="keyboard",target=keyboard,args=[cmd_queue,lambda: run_app])
     keyboard_thread.start()
 
+    if args.c != None:
+        if args.c.lower() == "on":
+            hmc_thread._reset_instrument()
+            hmc_thread.set_output_value(1,5,1.6)
+            hmc_thread.set_output_value(2,5,1.6)
+            hmc_thread.set_output_value(3,5,0.6)
+            hmc_thread.output_enable(1)
+            hmc_thread.output_enable(2)
+            hmc_thread.output_enable(3)
+            hmc_thread.master_enable()
 
-    if args.c.lower() == "on":
-        hmc_thread._reset_instrument()
-        hmc_thread.set_output_value(1,5,1.6)
-        hmc_thread.set_output_value(2,5,1.6)
-        hmc_thread.set_output_value(3,5,0.6)
-        hmc_thread.output_enable(1)
-        hmc_thread.output_enable(2)
-        hmc_thread.output_enable(3)
-        hmc_thread.master_enable()
+        if args.c.lower() == "off":
 
-    if args.c.lower() == "off":
-
-        hmc_thread.master_disable()
-        hmc_thread.output_disable(1)
-        hmc_thread.output_disable(2)
-        hmc_thread.output_disable(3)
+            hmc_thread.master_disable()
+            hmc_thread.output_disable(1)
+            hmc_thread.output_disable(2)
+            hmc_thread.output_disable(3)
 
     while run_app:
         while not cmd_queue.empty():
