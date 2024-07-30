@@ -469,7 +469,10 @@ if __name__ == "__main__":
         with open(hmc_thread.datalogfile,"a") as f:
             f.write("{0:},{1:f},{2:f},{3:f},{4:f},{5:f},{6:f}\n".format(dt, curr1, voltage1, curr2, voltage2, curr3, voltage3))
 
-
+    hmc_thread.master_disable()
+    hmc_thread.output_disable(1)
+    hmc_thread.output_disable(2)
+    hmc_thread.output_disable(3)
     hmc_thread.stop()
     hmc_thread.join()
     keyboard_thread.join()
