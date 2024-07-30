@@ -13,6 +13,8 @@ import logging
 import threading
 import queue
 import argparse
+import os
+from datetime import datetime
 
 menu_data = {
     'title': "HMC 8043",
@@ -29,15 +31,17 @@ menu_data = {
         {'title': "set ouput <ch#> <V-value> <I-limit> ", 'desc': "Set channel voltage ouput value and current limit"},
         {'title': "output <ch#> <on|off>", 'desc': "Turn output on/off for ch#"},
         {'title': "master output <on|off>", 'desc': "Turn master output on/off"},
+        {'title': "off", 'desc': "Turn all outputs off"},
+        
 
         #{'title': "sense prot <value>", 'desc': "Set sense protection limit value"},
-        #{'title': "set logfile  <name>", 'desc': "Name of logfile for data (default: data.log)"},
+        {'title': "set logfile  <name>", 'desc': "Name of logfile for data (default: data.log)"},
         #{'title': "start meas time <time in sec>", 'desc': "Start continuous measurement series (value: time[s],-1=infinite"},
         #{'title': "start meas rep <N>", 'desc': "Start measurement series with N repititions"},
         #{'title': "start meas sweep <start> <stop> <#steps> <slimit>", 'desc': "Start measurement sweep"},
 
         #        {'title': "enable ramp", 'desc': "Source value will be ramped up/down"},
-       {'title': "disable ramp", 'desc': "Disable ramp"},
+       ##{'title': "disable ramp", 'desc': "Disable ramp"},
         #{'title': "stop meas", 'desc': "Cancel active  measurement"},
         #{'title': "set no triggers <N>", 'desc': "Set number of triggers"},
     ]
@@ -55,7 +59,7 @@ class HMC8043(threading.Thread):
 
         threading.Thread.__init__(self)
         self.thread_name = name
-        self.log = logging.getLogger(log_name + ".keithley2410")
+        self.log = logging.getLogger(log_name)
         self.menu_data = menu_data
         self.instrument_id = ''
         self.__exitFlag = False
@@ -200,8 +204,13 @@ class HMC8043(threading.Thread):
                     self.master_disable()
                 if cmd_list[2] == "on":
                     self.master_enable()
+                    
 
-
+        elif "off"== cmd.lower():
+             self.master_disable()
+             self.output_disable(1)
+             self.output_disable(2)
+             self.output_disable(3)
 
     def set_channel(self,ch):
         if not (self._port_is_open()):
@@ -275,7 +284,7 @@ class HMC8043(threading.Thread):
             self.log.info("Resetting instrument!")
             self._ser.write("*RST\n".encode())
             #self._ser.write("SYST:TIME:RES\n")
-            time.sleep(0.1)
+            time.sleep(1)
 
     def _get_id(self):
 
@@ -318,6 +327,25 @@ class HMC8043(threading.Thread):
             self.log.info("Enabled master output on HMC 8043")
         else:
             self.log.warning("Serial port is not open!")
+   
+    def measure(self, ch):
+
+        if(self._port_is_open()):
+          
+            self._ser.write("INST OUT{0:d}\nMEAS:CURR?\n".format(ch).encode())
+            time.sleep(0.01)
+            curr = float(self._ser.readline().decode().rstrip("\r"))
+            self._ser.write("INST OUT{0:d}\nMEAS:VOLT?\n".format(ch).encode())
+            time.sleep(0.01)
+            voltage = float(str(self._ser.readline().decode().rstrip("\r")))
+
+            #self.log.info("Measured: " + str(curr))
+            return curr, voltage
+
+        else:
+            print("--------2")
+            self.log.warning("Serial port is not open!")
+            return -1,-1
 
 def get_serial_ports():
     ports = list_ports.comports(include_links=False)
@@ -339,7 +367,7 @@ if __name__ == "__main__":
     serial_port = ''
     ports = get_serial_ports()
 
-    parser = argparse.ArgumentParser(description="Keithley 2410 Control")
+    parser = argparse.ArgumentParser(description="HMC8043 Control")
     parser.add_argument("--com-port",choices=list(ports.values()),help="Name of com port")
     parser.add_argument("-c",choices=("on","off"),help="Config")
 
@@ -353,13 +381,14 @@ if __name__ == "__main__":
     else:
         serial_port = args.com_port
     #config_file = args.config_file
-    LOG_NAME = "keithley2410"
+    LOG_NAME = "HMC8043"
     cmd_queue = queue.Queue(5)
     config_queue = queue.Queue(20)
 
     log = logging.getLogger(LOG_NAME)
     log.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(levelname)s - %(funcName)s - %(message)s - %(asctime)s","%Y-%m-%d %H:%M:%S")
+
 
     log_file_handler = logging.FileHandler(LOG_NAME + ".log")
     log_file_handler.setLevel(logging.DEBUG)
@@ -393,14 +422,16 @@ if __name__ == "__main__":
     keyboard_thread = threading.Thread(name="keyboard",target=keyboard,args=[cmd_queue,lambda: run_app])
     keyboard_thread.start()
 
+
+    ds_start = datetime.timestamp(datetime.now())
     if args.c != None:
         if args.c.lower() == "on":
             hmc_thread._reset_instrument()
-            hmc_thread.set_output_value(1,5,1.6)
-            hmc_thread.set_output_value(2,5,1.6)
-            hmc_thread.set_output_value(3,5,0.6)
-            hmc_thread.output_enable(1)
-            hmc_thread.output_enable(2)
+            #hmc_thread.set_output_value(1,1,1.6)
+            #hmc_thread.set_output_value(2,2,1.6)
+            hmc_thread.set_output_value(3,3,0.5)
+            #hmc_thread.output_enable(1)
+            #hmc_thread.output_enable(2)
             hmc_thread.output_enable(3)
             hmc_thread.master_enable()
 
@@ -410,6 +441,12 @@ if __name__ == "__main__":
             hmc_thread.output_disable(1)
             hmc_thread.output_disable(2)
             hmc_thread.output_disable(3)
+           
+           
+
+    if not(os.path.isfile(hmc_thread.datalogfile)):
+        with open(hmc_thread.datalogfile,"a") as f:
+            f.write("time,volt_ch1, curr_ch1,volt_ch2, curr_ch2,volt_ch3, curr_ch4\n",)
 
     while run_app:
         while not cmd_queue.empty():
@@ -422,6 +459,16 @@ if __name__ == "__main__":
             else:
                 hmc_thread.decode_cmd(cmd)
         time.sleep(0.5)
+        curr1, voltage1 = hmc_thread.measure(1)
+        curr2, voltage2 = hmc_thread.measure(2)
+        curr3, voltage3 = hmc_thread.measure(3)
+        
+     
+        dt = datetime.now()
+        ts = datetime.timestamp(dt) - ds_start
+        with open(hmc_thread.datalogfile,"a") as f:
+            f.write("{0:},{1:f},{2:f},{3:f},{4:f},{5:f},{6:f}\n".format(dt, curr1, voltage1, curr2, voltage2, curr3, voltage3))
+
 
     hmc_thread.stop()
     hmc_thread.join()
