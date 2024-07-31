@@ -211,7 +211,12 @@ class HMC8043(threading.Thread):
              self.output_disable(1)
              self.output_disable(2)
              self.output_disable(3)
-
+        
+        elif "on"== cmd.lower():
+            hmc_thread.set_output_value(3,5,0.5)
+            hmc_thread.output_enable(3)
+            hmc_thread.master_enable()
+            
     def set_channel(self,ch):
         if not (self._port_is_open()):
             if not self._connect():
@@ -429,7 +434,7 @@ if __name__ == "__main__":
             hmc_thread._reset_instrument()
             #hmc_thread.set_output_value(1,1,1.6)
             #hmc_thread.set_output_value(2,2,1.6)
-            hmc_thread.set_output_value(3,3,0.5)
+            hmc_thread.set_output_value(3,5,0.5)
             #hmc_thread.output_enable(1)
             #hmc_thread.output_enable(2)
             hmc_thread.output_enable(3)
